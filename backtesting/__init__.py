@@ -1,14 +1,14 @@
 """
-Polymarket Insider Bot - Backtesting Framework
+Backtesting module for Polymarket insider trading bot.
 
-This module provides a complete backtesting framework for validating
-insider signal detection algorithms using historical Polymarket trade data.
+This module provides comprehensive backtesting capabilities to validate
+trading strategies using historical Polymarket data.
 """
 
 from .data_loader import DataLoader
-from .wallet_tracker import WalletTracker
-from .market_state import MarketState
-from .signal_detectors import SignalDetector
+from .wallet_tracker import WalletTracker, WalletMetrics
+from .market_state import MarketState, MarketInfo
+from .signal_detectors import SignalDetectors, Signal
 from .trade_simulator import TradeSimulator, Position
 from .performance_analyzer import PerformanceAnalyzer
 from .backtest_runner import BacktestRunner
@@ -16,8 +16,11 @@ from .backtest_runner import BacktestRunner
 __all__ = [
     'DataLoader',
     'WalletTracker',
+    'WalletMetrics',
     'MarketState',
-    'SignalDetector',
+    'MarketInfo',
+    'SignalDetectors',
+    'Signal',
     'TradeSimulator',
     'Position',
     'PerformanceAnalyzer',
