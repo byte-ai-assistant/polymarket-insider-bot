@@ -4,7 +4,7 @@ Wallet Tracker - Track wallet trading history and metrics during backtest replay
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from collections import deque
 import logging
 
@@ -39,14 +39,18 @@ class WalletMetrics:
     
     @property
     def account_age_days(self) -> float:
-        """Calculate account age in days."""
+        """Calculate account age in days from first trade to last known trade.
+        Note: For accurate age relative to current time, use
+        WalletTracker.get_account_age_hours(address, current_time) instead."""
         if not self.first_trade or not self.last_trade:
             return 0.0
         return (self.last_trade - self.first_trade).total_seconds() / 86400
-    
+
     @property
     def account_age_hours(self) -> float:
-        """Calculate account age in hours."""
+        """Calculate account age in hours from first trade to last known trade.
+        Note: This underestimates age. For signal detection, prefer
+        computing (current_time - first_trade) directly."""
         if not self.first_trade or not self.last_trade:
             return 0.0
         return (self.last_trade - self.first_trade).total_seconds() / 3600
