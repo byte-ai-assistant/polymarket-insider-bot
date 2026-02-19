@@ -61,14 +61,14 @@ class TradeSimulator:
     def __init__(
         self,
         starting_capital: float = 5000,
-        max_concurrent_positions: int = 5,
+        max_concurrent_positions: int = 8,
         max_position_size_pct: float = 10,  # Max 10% per trade
         max_market_exposure_pct: float = 30,  # Max 30% in one market
-        stop_loss_pct: float = 15,  # 15% stop loss
+        stop_loss_pct: float = 30,  # 30% stop loss (was 15%, too tight for prediction markets)
         take_profit_pct: float = 25,  # 25% take profit
-        max_hold_hours: float = 48,  # Max 48 hours per position
-        trading_fee_pct: float = 2.0,  # 2% fees
-        slippage_bps: tuple = (10, 30)  # 0.1% to 0.3% slippage
+        max_hold_hours: float = 72,  # 72h max hold (was 48h)
+        trading_fee_pct: float = 0.5,  # 0.5% fees (was 2%, unrealistically high)
+        slippage_bps: tuple = (5, 15)  # 0.05% to 0.15% slippage (was 0.1%-0.3%)
     ):
         """
         Initialize trade simulator.
@@ -233,11 +233,10 @@ class TradeSimulator:
                 )
                 continue
             
-            # Exit condition 4: Time decay
+            # Exit condition 4: Time decay (only exit at a loss after max hold time)
             hours_held = (current_time - position.entry_time).total_seconds() / 3600
             if hours_held >= self.max_hold_hours:
-                # Only exit if not profitable
-                if pnl_pct < 5:  # Less than 5% profit
+                if pnl_pct < 0:  # Only force-close if losing
                     self._close_position(
                         position,
                         exit_price=current_price,
@@ -245,17 +244,16 @@ class TradeSimulator:
                         reason='time_decay'
                     )
                     continue
-            
-            # Exit condition 5: Market closing soon with minimal profit
-            if market.hours_until_resolution is not None and market.hours_until_resolution < 6:
-                if pnl_pct < 5:
-                    self._close_position(
-                        position,
-                        exit_price=current_price,
-                        exit_time=current_time,
-                        reason='market_closing'
-                    )
-                    continue
+
+            # Exit condition 5: Market closing soon — take whatever we have
+            if market.hours_until_resolution is not None and market.hours_until_resolution < 2:
+                self._close_position(
+                    position,
+                    exit_price=current_price,
+                    exit_time=current_time,
+                    reason='market_closing'
+                )
+                continue
     
     def _close_position(
         self,
@@ -306,44 +304,48 @@ class TradeSimulator:
     
     def _can_take_position(self, signal: Signal) -> bool:
         """Check if we can take a new position."""
-        
+
         # Check max concurrent positions
         if len(self.positions) >= self.max_concurrent_positions:
             logger.debug("Max concurrent positions reached")
             return False
-        
-        # Check if we have enough capital
-        estimated_size = self.capital * (signal.recommended_size_pct / 100)
-        if estimated_size > self.capital * 0.5:  # Don't risk more than 50% at once
-            logger.debug("Insufficient capital for position")
+
+        # Check if we have enough capital (minimum $50 to trade)
+        if self.capital < 50:
+            logger.debug("Insufficient capital for any position")
             return False
-        
-        # Check market exposure
+
+        # Check market exposure (use current capital, not initial)
         market_exposure = sum(
-            p.size for p in self.positions 
+            p.size for p in self.positions
             if p.market_id == signal.market_id and p.is_open
         )
-        max_market_exposure = self.initial_capital * (self.max_market_exposure_pct / 100)
-        
+        max_market_exposure = self.capital * (self.max_market_exposure_pct / 100)
+
+        estimated_size = self.capital * signal.recommended_size_pct
         if market_exposure + estimated_size > max_market_exposure:
             logger.debug(f"Max market exposure reached for market {signal.market_id}")
             return False
-        
+
         return True
     
     def _calculate_position_size(self, signal: Signal) -> float:
-        """Calculate position size based on Kelly Criterion and risk limits."""
-        
-        # Kelly-based size
-        kelly_size = self.initial_capital * signal.recommended_size_pct
-        
-        # Apply max position size limit
-        max_size = self.initial_capital * (self.max_position_size_pct / 100)
+        """Calculate position size based on Kelly Criterion and risk limits.
+        Uses current capital (not initial) so sizing scales with equity."""
+
+        # Use current capital for dynamic sizing
+        current_equity = self.capital
+
+        # Kelly-based size from current equity
+        kelly_size = current_equity * signal.recommended_size_pct
+
+        # Apply max position size limit based on current equity
+        max_size = current_equity * (self.max_position_size_pct / 100)
         position_size = min(kelly_size, max_size)
-        
-        # Don't exceed available capital
-        position_size = min(position_size, self.capital * 0.8)  # Keep 20% reserve
-        
+
+        # Don't exceed available capital (keep 20% reserve)
+        position_size = min(position_size, current_equity * 0.8)
+
         return position_size
     
     def _apply_slippage(self, price: float, side: str) -> float:

@@ -36,21 +36,21 @@ class Settings(BaseSettings):
     min_confidence: Decimal = Decimal("0.65")
     max_position_size_pct: Decimal = Decimal("10.0")
     kelly_fraction: Decimal = Decimal("0.25")
-    stop_loss_pct: Decimal = Decimal("15.0")
-    max_concurrent_positions: int = 5
+    stop_loss_pct: Decimal = Decimal("30.0")  # Widened from 15% (too tight for prediction markets)
+    max_concurrent_positions: int = 8  # Increased from 5 for diversification
     max_daily_loss_pct: Decimal = Decimal("10.0")
-    
+
     # Risk Management
     min_liquidity_usd: Decimal = Decimal("5000.00")
     min_market_volume_usd: Decimal = Decimal("50000.00")
     max_slippage_pct: Decimal = Decimal("2.0")
-    
+
     # Signal Detection Thresholds
     fresh_account_max_age_days: int = 7
-    fresh_account_min_size_usd: Decimal = Decimal("10000")
-    proven_winner_min_trades: int = 20
-    proven_winner_min_win_rate: Decimal = Decimal("0.70")
-    volume_spike_threshold: Decimal = Decimal("10.0")
+    fresh_account_min_size_usd: Decimal = Decimal("1000")  # Lowered from $10K
+    proven_winner_min_trades: int = 10  # Lowered from 20
+    proven_winner_min_win_rate: Decimal = Decimal("0.65")  # Lowered from 0.70
+    volume_spike_threshold: Decimal = Decimal("5.0")  # Lowered from 10x
     wallet_cluster_min_wallets: int = 3
     
     # Notifications
